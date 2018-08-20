@@ -12,26 +12,27 @@ from accessexcel import accessExcel
 from a_upload import browserAccess
 from a_upload import browser
 
+
 uploadType = ""
 oldUrl = ""
 StatusText = "Loading..."
 loggedin=""
-# rownum = 5
-# print(type(rownum))
 dname = browserAccess("https://login.veevavault.com/auth/login", "girish@vv-agency.com", "V@ult123")
+excelFile=accessExcel("", "")
 
 def updateExcel(rowNum):
-    print(rowNum)
     exlFilePath = excelPathVar.get()
     excelFile = accessExcel(exlFilePath, "Sheet1")
     excelFile.selectSheet()
     excelData = excelFile.accessFields(int(rowNum))
 
     if(excelData["Document Type"] == "Email Fragment"):
-        excelFile.modifySheet(excelData["AUT"], 'XX-XXXXX', excelData["EF Number"], "E5" )
-        excelFile.modifySheet(excelData["Tracking Id"], '_', '%5F', "E5" )
-        excelFile.modifySheet(excelData["Tracking Id"], '-', '%2D', "E5" )
+        excelFile.modifySheet(excelData["AUT"], 'XX-XXXXX', excelData["EF Number"], excelData["trackingid_cell"] )
+        excelFile.modifySheet(excelData["Tracking Id"], '_', '%5F', excelData["trackingid_cell"] )
+        excelFile.modifySheet(excelData["Tracking Id"], '-', '%2D', excelData["trackingid_cell"] )
+        excelFile.updateCell({"source_cell":"C1", "Dest_cell":excelData["trackingid_cell"]})
 
+    excelData = excelFile.accessFields(int(rowNum))
     return excelData
 
 
@@ -42,22 +43,22 @@ def uploadTemplate():
 
 def uploadAsset():
     rnum=assetRow.get()
-    # updateExcel()
-    excelData=updateExcel(rnum)
+    exlFilePath = excelPathVar.get()
+    excelFile = accessExcel(exlFilePath, "Sheet1")
+    excelFile.selectSheet()
+    excelData = excelFile.accessFields(int(rnum))
+    # excelData=updateExcel(rnum)
     commonTasks(excelData)
-
     oldUrl = browser.current_url
-    print("OLD URL " + oldUrl)
     try:
         WebDriverWait(browser, 100).until(EC.url_changes(oldUrl))
         activeLink = browser.current_url
-        print("ACTIVE LINK " + activeLink)
         subStr = activeLink[-8:]
         docInfoNumber = subStr[0:4]
-        print("Doc No: "+ docInfoNumber)
+        excelFile.updateDocInfo(docInfoNumber)
 
     except Exception as pn:
-        print("Not found")
+        print("Not found ")
 
 
 def uploadFragment():
@@ -69,7 +70,6 @@ def uploadFragment():
     # Open web Driver
 def commonTasks(excelData):
     # dname = browserAccess("https://login.veevavault.com/auth/login", "girish@vv-agency.com", "V@ult123")
-    print("LOGGEDIN  "+ str(dname.loggedin))
     if(dname.loggedin==False):
         dname.siteLogin()
         dname.elementAccess({"findtype": "id", "findText":"search_main_box", "clear" : False, "sendkeys": False, "enterRequired" : False, "click" : False})
@@ -77,9 +77,6 @@ def commonTasks(excelData):
         dname.loggedin=True
     else:
         browser.get('https://vv-agency-indegene.veevavault.com/ui/#inbox/upload')
-
-
-    # statusVar.set("Entering upload page...")
 
     # Select file to upload
     dname.elementAccess({"findtype": "id", "findText":"inboxFileChooserHTML5", "clear" : False, "sendkeys": True, "keyText": excelData["Path"], "enterRequired" : False, "click" : False})
@@ -128,10 +125,8 @@ def commonTasks(excelData):
 
     # Click save Button
     oldUrl = browser.current_url
-    print(type(oldUrl))
     if(excelData["Document Type"] != "Email Template"):
         dname.elementAccess({"findtype": "linktext", "findText": "Save", "clear" : False, "sendkeys": False, "enterRequired" : False, "click" : True})
-
 
     if(excelData["Document Type"] == "Email Fragment"):
         addAssetsFragments()
@@ -140,8 +135,6 @@ def commonTasks(excelData):
 
     if(excelData["Document Type"] == "Email Template" ):
         addAssetsTemplate()
-        print("Post add template")
-
         dname.elementAccess({"findtype": "xpath", "findText":'//*[@id="ui-id-1"]/form/div[1]/div/div[3]/label/input', "clear" : False, "sendkeys": True, "keyText": excelData["Image path"], "enterRequired" : False, "click" : False})
         dname.elementAccess({"findtype": "linktext", "findText": "Upload", "clear" : False, "sendkeys": False, "enterRequired" : False, "click" : True})
 
@@ -152,11 +145,10 @@ def addAssetsFragments():
                 EC.presence_of_element_located((By.XPATH, '//*[@id="di3Form"]/div[2]/div[4]/h3/a')))
             assetBtn.click()
         except Exception as xp:
-            print("Waiting asset dialog box" + xp)
+            print("Waiting asset dialog box")
             addAssetsFragments()
 
 def addAssetsTemplate():
-        print("Inside add template")
         try:
             assetBtn = WebDriverWait(browser, 100).until(
                 EC.presence_of_element_located((By.XPATH, '//*[@id="di3Form"]/div[2]/div[5]/h3/a')))
@@ -167,11 +159,15 @@ def addAssetsTemplate():
 
 def closeWindow():
     root.destroy()
+    browser.quit()
 
 
 # GUI-------------------------------------------------
 root = Tk()
-root.geometry("500x220")
+x_val = root.winfo_screenwidth()-500
+y_val = 0
+winlocation="500x220+"+str(x_val)+"+"+str(y_val)
+root.geometry(winlocation)
 root.title("Indegene Email Uploader")
 Label(root, text = "INDEGENE - Email Upload App", fg="Gray",font=("verdana", 11), relief=RIDGE).grid(row=0, column=0, columnspan=4, pady=2, padx=0, sticky=W)
 
